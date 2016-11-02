@@ -45,8 +45,15 @@ fn main() {
                     println!("src: {}", src);
                     println!("{}", to_hex_string(&buf));
 
-                    let s = str::from_utf8(&buf[4 .. amt]).unwrap_or("Invalid str").to_string();
+                    let s = str::from_utf8(&buf[4 .. amt]).unwrap_or("Invalid str");
                     println!("{}", s);
+
+                    match s {
+                        s if s.starts_with("getinfo") => unimplemented!(),
+                        s if s.starts_with("getstatus") => unimplemented!(),
+                        s if s.starts_with("getchallenge") => unimplemented!(),
+                        _ => panic!("Invalid request type")
+                    }
                 });
             },
             Err(e) => println!("Could not receive a packet: {}", e)
