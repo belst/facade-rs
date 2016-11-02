@@ -1,9 +1,10 @@
 use std::str;
 use std::fmt::Write;
 use std::thread;
+use std::sync::Arc;
 use std::net::UdpSocket;
 
-fn toHexString(bytes: &[u8]) -> String {
+fn to_hex_string(bytes: &[u8]) -> String {
     let mut s = String::new();
     for &byte in bytes {
         write!(&mut s, "{:X} ", byte).unwrap();
@@ -14,9 +15,14 @@ fn toHexString(bytes: &[u8]) -> String {
 fn main() {
     
     const PREFIX: &'static [u8; 4] = b"\xFF\xFF\xFF\xFF";
+    const LISTEN: &'static str = "127.0.0.1:5555";
+    const HOST: &'static str = "94.23.7.172:27960";
+
+    let mut getstatus : Arc<(u32, &mut [u8])> = Arc::new((0, &mut []));
+    let mut getinfo : Arc<(u32, &mut [u8])> = Arc::new((0, &mut []));
     
     println!("Spinning up server.");
-    let socket = match UdpSocket::bind("127.0.0.1:5555") {
+    let socket = match UdpSocket::bind(LISTEN) {
         Ok(s) => {
             println!("Listening on: {}", s.local_addr().unwrap());
             s
@@ -37,7 +43,10 @@ fn main() {
                     println!("new thread Spawned.");
                     println!("amt: {}", amt);
                     println!("src: {}", src);
-                    println!("{}", toHexString(&buf));
+                    println!("{}", to_hex_string(&buf));
+
+                    let s = str::from_utf8(&buf[4 .. amt]).unwrap_or("Invalid str").to_string();
+                    println!("{}", s);
                 });
             },
             Err(e) => println!("Could not receive a packet: {}", e)
