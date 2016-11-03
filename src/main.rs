@@ -1,8 +1,13 @@
+extern crate dotenv;
+
 use std::str;
+use std::env;
 use std::fmt::Write;
 use std::thread;
 use std::sync::Arc;
-use std::net::{UdpSocket, ToSocketAddrs};
+use std::net::{UdpSocket, ToSocketAddrs, SocketAddr};
+use std::iter::FromIterator;
+use dotenv::dotenv;
 
 fn to_hex_string(bytes: &[u8]) -> String {
     let mut s = String::new();
@@ -10,6 +15,10 @@ fn to_hex_string(bytes: &[u8]) -> String {
         write!(&mut s, "{:X} ", byte).unwrap();
     }
     s
+}
+
+fn concat_bstring(str1: &[u8], str2: &[u8]) -> Vec<u8> {
+    str1.iter().cloned().chain(str2.iter().cloned()).collect()
 }
 
 fn getstatus<A: ToSocketAddrs>(target: A) -> Result<Vec<u8>, String> {
@@ -35,11 +44,14 @@ fn getstatus<A: ToSocketAddrs>(target: A) -> Result<Vec<u8>, String> {
 }
 
 fn main() {
+    dotenv().ok();
 
     const PREFIX: &'static [u8; 4] = b"\xFF\xFF\xFF\xFF";
-    const LISTEN: &'static str = "0.0.0.0:5555";
-    const HOST: &'static str = "94.23.7.172:27960";
-    const CHALLENGERESPONSE: &'static [u8] = b"\xFF\xFF\xFF\xFFprint\nET://94.23.7.172:27960";
+    let LISTEN =
+        env::var("LISTEN").unwrap_or("0.0.0.0:27960".to_string()).parse::<SocketAddr>().unwrap();
+    let HOST = env::var("HOST").expect("No HOST given!").parse::<SocketAddr>().unwrap();
+    let CHALLENGERESPONSE = concat_bstring(b"\xFF\xFF\xFF\xFFprint\nET://",
+                                           env::var("HOST").unwrap().as_bytes());
 
     let mut getinfo: Arc<(u32, &mut [u8])> = Arc::new((0, &mut []));
 
@@ -62,6 +74,7 @@ fn main() {
                     continue;
                 };
                 let sock = socket.try_clone().unwrap();
+                let CHALLENGERESPONSE = CHALLENGERESPONSE.clone();
                 thread::spawn(move || {
                     println!("new thread Spawned.");
                     println!("amt: {}", amt);
@@ -76,7 +89,9 @@ fn main() {
                         s if s.starts_with("getstatus") => {
                             sock.send_to(&getstatus(HOST).unwrap(), src)
                         }
-                        s if s.starts_with("getchallenge") => sock.send_to(CHALLENGERESPONSE, src),
+                        s if s.starts_with("getchallenge") => {
+                            sock.send_to(&CHALLENGERESPONSE[..], src)
+                        }
                         _ => panic!("Invalid request type"),
                     }
                 });
