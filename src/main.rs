@@ -16,8 +16,17 @@ fn to_hex_string(bytes: &[u8]) -> String {
     s
 }
 
-fn concat_bstring(str1: &[u8], str2: &[u8]) -> Vec<u8> {
-    str1.iter().cloned().chain(str2.iter().cloned()).collect()
+fn concat_bstring(strs: &[&[u8]]) -> Vec<u8> {
+    strs.into_iter().flat_map(|str| str.iter().cloned()).collect()
+}
+
+#[test]
+fn concat_bstring_test() {
+    let a = concat_bstring(&[&[1, 2, 3], &[4, 5, 6], &[7, 8, 9]]);
+    assert_eq!(a, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    let empty: &[&[u8]] = &[];
+    let emptyvec: Vec<u8> = vec![];
+    assert_eq!(concat_bstring(empty), emptyvec);
 }
 
 fn getstatus<A: ToSocketAddrs>(target: A) -> Result<Vec<u8>, String> {
@@ -51,8 +60,8 @@ fn main() {
     let LISTEN =
         env::var("LISTEN").unwrap_or("0.0.0.0:27960".to_string()).parse::<SocketAddr>().unwrap();
     let HOST = env::var("HOST").expect("No HOST given!").parse::<SocketAddr>().unwrap();
-    let CHALLENGERESPONSE = concat_bstring(b"\xFF\xFF\xFF\xFFprint\nET://",
-                                           env::var("HOST").unwrap().as_bytes());
+    let CHALLENGERESPONSE = concat_bstring(&[b"\xFF\xFF\xFF\xFFprint\nET://",
+                                             env::var("HOST").unwrap().as_bytes()]);
 
     let mut getinfo: Arc<(u32, &mut [u8])> = Arc::new((0, &mut []));
 
