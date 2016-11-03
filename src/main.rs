@@ -6,7 +6,6 @@ use std::fmt::Write;
 use std::thread;
 use std::sync::Arc;
 use std::net::{UdpSocket, ToSocketAddrs, SocketAddr};
-use std::iter::FromIterator;
 use dotenv::dotenv;
 
 fn to_hex_string(bytes: &[u8]) -> String {
@@ -26,13 +25,15 @@ fn getstatus<A: ToSocketAddrs>(target: A) -> Result<Vec<u8>, String> {
         Ok(s) => s,
         Err(e) => panic!("Could not bind socket: {}", e),
     };
-    match socket.send_to(b"\xFF\xFF\xFF\xFFgetstatus\n", target) {
-        Ok(..) => {}
-        Err(e) => return Err(format!("{}", e)),
+    if let Err(e) = socket.connect(target) {
+        return Err(format!("{}", e));
+    }
+    if let Err(e) = socket.send(b"\xFF\xFF\xFF\xFFgetstatus\n") {
+        return Err(format!("{}", e));
     }
     let mut buf = [0; 2048];
-    match socket.recv_from(&mut buf) {
-        Ok((amt, _)) => {
+    match socket.recv(&mut buf) {
+        Ok(amt) => {
             if buf.starts_with(b"\xFF\xFF\xFF\xFFstatusResponse") {
                 Ok((&buf[0..amt]).to_owned())
             } else {
