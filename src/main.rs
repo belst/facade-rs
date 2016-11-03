@@ -2,7 +2,7 @@ use std::str;
 use std::fmt::Write;
 use std::thread;
 use std::sync::Arc;
-use std::net::UdpSocket;
+use std::net::{UdpSocket, ToSocketAddrs};
 
 fn to_hex_string(bytes: &[u8]) -> String {
     let mut s = String::new();
@@ -10,6 +10,28 @@ fn to_hex_string(bytes: &[u8]) -> String {
         write!(&mut s, "{:X} ", byte).unwrap();
     }
     s
+}
+
+fn getstatus<A: ToSocketAddrs>(target: A) -> Result<Vec<u8>, String> {
+    let socket = match UdpSocket::bind("0.0.0.0:0") {
+        Ok(s) => s,
+        Err(e) => panic!("Could not bind socket: {}", e),
+    };
+    match socket.send_to(b"\xFF\xFF\xFF\xFFgetstatus\n", target) {
+        Ok(..) => {}
+        Err(e) => return Err(format!("{}", e)),
+    }
+    let mut buf = [0; 2048];
+    match socket.recv_from(&mut buf) {
+        Ok((amt, _)) => {
+            if buf.starts_with(b"\xFF\xFF\xFF\xFFstatusResponse") {
+                Ok((&buf[0..amt]).to_owned())
+            } else {
+                Err("Invalid response".to_string())
+            }
+        }
+        Err(e) => Err(format!("{}", e)),
+    }
 }
 
 fn main() {
@@ -51,7 +73,9 @@ fn main() {
 
                     match s {
                         s if s.starts_with("getinfo") => unimplemented!(),
-                        s if s.starts_with("getstatus") => unimplemented!(),
+                        s if s.starts_with("getstatus") => {
+                            sock.send_to(&getstatus(HOST).unwrap(), src)
+                        }
                         s if s.starts_with("getchallenge") => sock.send_to(CHALLENGERESPONSE, src),
                         _ => panic!("Invalid request type"),
                     }
