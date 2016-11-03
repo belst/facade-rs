@@ -16,7 +16,7 @@ fn to_hex_string(bytes: &[u8]) -> String {
     s
 }
 
-fn concat_bstring(strs: &[&[u8]]) -> Vec<u8> {
+fn concat_bstring<T: Clone>(strs: &[&[T]]) -> Vec<T> {
     strs.into_iter().flat_map(|str| str.iter().cloned()).collect()
 }
 
