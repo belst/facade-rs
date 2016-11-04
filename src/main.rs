@@ -4,7 +4,7 @@ use std::str;
 use std::env;
 use std::fmt::Write;
 use std::{thread, time};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use std::net::{UdpSocket, ToSocketAddrs, SocketAddr};
 use dotenv::dotenv;
 
@@ -98,7 +98,7 @@ fn main() {
     let CHALLENGERESPONSE = concat_bstring(&[b"\xFF\xFF\xFF\xFFprint\nET://",
                                              env::var("HOST").unwrap().as_bytes()]);
 
-    let info = Arc::new(Mutex::new(getinfo(&HOST).unwrap()));
+    let info = Arc::new(RwLock::new(getinfo(&HOST).unwrap()));
 
     {
         let child_info = info.clone();
@@ -106,7 +106,7 @@ fn main() {
             loop {
                 // update info every 5 minutes
                 thread::sleep(time::Duration::from_secs(300));
-                let mut info = child_info.lock().unwrap();
+                let mut info = child_info.write().unwrap();
                 println!("Updating info");
                 *info = getinfo(HOST).unwrap();
             }
@@ -148,10 +148,10 @@ fn main() {
                             let (_, challenge) = s.split_at("getinfo".len());
                             let challenge = challenge.trim();
                             if challenge.len() != 0 {
-                                sock.send_to(&*add_challenge(&*info.lock().unwrap(), challenge, 17),
+                                sock.send_to(&*add_challenge(&*info.read().unwrap(), challenge, 17),
                                              src)
                             } else {
-                                sock.send_to(&*info.lock().unwrap(), src)
+                                sock.send_to(&*info.read().unwrap(), src)
                             }
                         }
                         s if s.starts_with("getstatus") => {
