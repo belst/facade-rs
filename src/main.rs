@@ -53,6 +53,41 @@ fn getstatus<A: ToSocketAddrs>(target: A) -> Result<Vec<u8>, String> {
     }
 }
 
+fn getinfo<A: ToSocketAddrs>(target: A) -> Result<Vec<u8>, String> {
+    let socket = match UdpSocket::bind("0.0.0.0:0") {
+        Ok(s) => s,
+        Err(e) => panic!("Could not bind socket: {}", e),
+    };
+    if let Err(e) = socket.connect(target) {
+        return Err(format!("{}", e));
+    }
+    if let Err(e) = socket.send(b"\xFF\xFF\xFF\xFFgetinfo\n") {
+        return Err(format!("{}", e));
+    }
+    let mut buf = [0; 2048];
+    match socket.recv(&mut buf) {
+        Ok(amt) => {
+            if buf.starts_with(b"\xFF\xFF\xFF\xFFinfoResponse") {
+                Ok((&buf[0..amt]).to_owned())
+            } else {
+                Err("Invalid response".to_string())
+            }
+        }
+        Err(e) => Err(format!("{}", e)),
+    }
+}
+
+fn add_challenge(haystack: &Vec<u8>, challenge: &str, len: usize) -> Vec<u8> {
+    let (first, second) = haystack.split_at(len);
+    let mut vec = Vec::new();
+    vec.extend(first.iter().cloned());
+    vec.extend(b"\\challenge\\");
+    vec.extend(challenge.as_bytes().iter().cloned());
+    vec.extend(second.iter().cloned());
+    vec
+}
+
+
 fn main() {
     dotenv().ok();
 
@@ -63,7 +98,7 @@ fn main() {
     let CHALLENGERESPONSE = concat_bstring(&[b"\xFF\xFF\xFF\xFFprint\nET://",
                                              env::var("HOST").unwrap().as_bytes()]);
 
-    let mut getinfo: Arc<(u32, &mut [u8])> = Arc::new((0, &mut []));
+    let mut info: Arc<Vec<u8>> = Arc::new(getinfo(HOST).unwrap());
 
     println!("Spinning up server.");
     let socket = match UdpSocket::bind(LISTEN) {
@@ -85,19 +120,35 @@ fn main() {
                 };
                 let sock = socket.try_clone().unwrap();
                 let CHALLENGERESPONSE = CHALLENGERESPONSE.clone();
+                let info = info.clone();
                 thread::spawn(move || {
                     println!("new thread Spawned.");
-                    println!("amt: {}", amt);
-                    println!("src: {}", src);
-                    println!("{}", to_hex_string(&buf));
+                    // println!("amt: {}", amt);
+                    // println!("src: {}", src);
+                    // println!("{}", to_hex_string(&buf));
 
                     let s = str::from_utf8(&buf[4..amt]).unwrap_or("Invalid str");
                     println!("{}", s);
 
                     match s {
-                        s if s.starts_with("getinfo") => unimplemented!(),
+                        s if s.starts_with("getinfo") => {
+                            let (_, challenge) = s.split_at("getinfo".len());
+                            let challenge = challenge.trim();
+                            if challenge.len() != 0 {
+                                sock.send_to(&*add_challenge(&*info, challenge, 17), src)
+                            } else {
+                                sock.send_to(&*info, src)
+                            }
+                        }
                         s if s.starts_with("getstatus") => {
-                            sock.send_to(&getstatus(HOST).unwrap(), src)
+                            let (_, challenge) = s.split_at("getstatus".len());
+                            let challenge = challenge.trim();
+                            let status = if challenge.len() != 0 {
+                                add_challenge(&getstatus(HOST).unwrap(), challenge, 19)
+                            } else {
+                                getstatus(HOST).unwrap()
+                            };
+                            sock.send_to(&status, src)
                         }
                         s if s.starts_with("getchallenge") => {
                             sock.send_to(&CHALLENGERESPONSE[..], src)
