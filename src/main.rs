@@ -105,9 +105,10 @@ fn main() {
         loop {
             // update info every 5 minutes
             thread::sleep(time::Duration::from_secs(300));
-            let mut info = child_info.write().unwrap();
             println!("Updating info");
-            *info = getinfo(HOST).unwrap();
+            let tmp = getinfo(HOST).unwrap();
+            let mut info = child_info.write().unwrap();
+            *info = tmp;
         }
     });
 
