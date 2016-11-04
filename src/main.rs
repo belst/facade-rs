@@ -100,18 +100,16 @@ fn main() {
 
     let info = Arc::new(RwLock::new(getinfo(&HOST).unwrap()));
 
-    {
-        let child_info = info.clone();
-        thread::spawn(move || {
-            loop {
-                // update info every 5 minutes
-                thread::sleep(time::Duration::from_secs(300));
-                let mut info = child_info.write().unwrap();
-                println!("Updating info");
-                *info = getinfo(HOST).unwrap();
-            }
-        });
-    }
+    let child_info = info.clone();
+    thread::spawn(move || {
+        loop {
+            // update info every 5 minutes
+            thread::sleep(time::Duration::from_secs(300));
+            let mut info = child_info.write().unwrap();
+            println!("Updating info");
+            *info = getinfo(HOST).unwrap();
+        }
+    });
 
     println!("Spinning up server.");
     let socket = match UdpSocket::bind(LISTEN) {
