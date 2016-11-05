@@ -1,6 +1,7 @@
 # Enemy Territory Server Facade
 
-[![Clippy Linting Result](https://clippy.bashy.io/github/belst/facade-rs/master/badge.svg)](https://clippy.bashy.io/github/belst/facade-rs/master/log) [![Build Status](https://travis-ci.org/belst/facade-rs.svg?branch=master)](https://travis-ci.org/belst/facade-rs)
+[![Clippy Linting Result](https://clippy.bashy.io/github/belst/facade-rs/master/badge.svg)](https://clippy.bashy.io/github/belst/facade-rs/master/log) [![Build Status](https://travis-ci.org/belst/facade-rs.svg?branch=master)](https://travis-ci.org/belst/facade-rs) [![codecov](https://codecov.io/gh/belst/facade-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/belst/facade-rs)
+
 
 Small server facade for ET servers. This programm will reply to `getinfo`, `getstatus` and `getchallenge` requests.
 
