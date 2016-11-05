@@ -97,7 +97,7 @@ fn replace_ver_test() {
     let mut v2: Vec<u8> = Vec::new();
     v.extend(before.iter());
     v2.extend(expected.iter());
-    let after = replace_ver(v);
+    let after = replace_ver(&v);
     assert_eq!(after, v2);
 }
 
