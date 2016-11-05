@@ -131,9 +131,14 @@ fn main() {
         .unwrap()
         .next()
         .unwrap();
-    let host = env::var("HOST").expect("No HOST given!").to_socket_addrs().unwrap().next().unwrap();
+    let host = env::var("SERVER_ADDR")
+        .expect("No SERVER_ADDR given!")
+        .to_socket_addrs()
+        .unwrap()
+        .next()
+        .unwrap();
     let challengeresponse = concat_bstring(&[b"\xFF\xFF\xFF\xFFprint\nET://",
-                                             env::var("HOST").unwrap().as_bytes()]);
+                                             env::var("SERVER_ADDR").unwrap().as_bytes()]);
     let master_servers: Vec<SocketAddr> = env::var("MASTER_SERVERS")
         .unwrap_or("etmaster.idsoftware.com:27950".to_string())
         .split_whitespace()
