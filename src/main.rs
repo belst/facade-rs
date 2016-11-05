@@ -72,11 +72,11 @@ fn getinfo<A: ToSocketAddrs>(target: A) -> Result<Vec<u8>, String> {
     }
 }
 
-fn add_challenge(haystack: &Vec<u8>, challenge: &str, len: usize) -> Vec<u8> {
+fn add_challenge(haystack: &[u8], challenge: &str, len: usize) -> Vec<u8> {
     let (first, second) = haystack.split_at(len);
     let mut vec = Vec::new();
     vec.extend(first.iter().cloned());
-    vec.extend(b"\\challenge\\");
+    vec.extend_from_slice(b"\\challenge\\");
     vec.extend(challenge.as_bytes().iter().cloned());
     vec.extend(second.iter().cloned());
     vec
@@ -108,7 +108,7 @@ const PREFIX: &'static [u8] = b"\xFF\xFF\xFF\xFF";
 fn upd_info_and_heartbeat<A: ToSocketAddrs>(socket: UdpSocket,
                                             host: A,
                                             info: Arc<RwLock<Vec<u8>>>,
-                                            master_servers: &Vec<A>) {
+                                            master_servers: &[A]) {
     println!("Updating Info");
     {
         // subscope so write lock gets freed early
@@ -201,7 +201,7 @@ fn main() {
                             let challenge = challenge.trim();
                             let info = info.read().unwrap();
                             let info = replace_ver(&info[..]);
-                            if challenge.len() != 0 {
+                            if !challenge.is_empty() {
                                 sock.send_to(&*add_challenge(&info, challenge, 17), src)
                             } else {
                                 sock.send_to(&*info, src)
@@ -210,7 +210,7 @@ fn main() {
                         s if s.starts_with("getstatus") => {
                             let (_, challenge) = s.split_at("getstatus".len());
                             let challenge = challenge.trim();
-                            let status = if challenge.len() != 0 {
+                            let status = if !challenge.is_empty() {
                                 add_challenge(&getstatus(host).unwrap(), challenge, 19)
                             } else {
                                 getstatus(host).unwrap()
