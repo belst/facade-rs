@@ -5,3 +5,5 @@ authors = ["belst <git@bel.st>"]
 
 [dependencies]
 dotenv="*"
+regex="*"
+lazy_static="*"
