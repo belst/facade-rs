@@ -1,3 +1,9 @@
 language: rust
 rust: 
-        - nightly
+  - nightly
+
+cache:
+  directories:
+    - $HOME/.cargo
+    - $HOME/.multirust
+    - target
