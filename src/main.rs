@@ -222,7 +222,7 @@ fn main() {
                             upd_info_and_heartbeat(sock, host, info, &master_servers);
                             tmp
                         }
-                        _ => panic!("Invalid request type"),
+                        s => panic!("Invalid request type: {}", s),
                     }
                 });
             }
