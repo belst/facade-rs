@@ -2,6 +2,7 @@ extern crate dotenv;
 extern crate regex;
 #[macro_use]
 extern crate lazy_static;
+extern crate threadpool;
 
 use std::str;
 use std::env;
@@ -10,6 +11,7 @@ use std::sync::{Arc, RwLock};
 use std::net::{UdpSocket, ToSocketAddrs, SocketAddr};
 use dotenv::dotenv;
 use regex::bytes::Regex;
+use threadpool::ThreadPool;
 
 fn concat_bstring<T: Clone>(strs: &[&[T]]) -> Vec<T> {
     strs.into_iter().flat_map(|str| str.iter().cloned()).collect()
@@ -176,6 +178,8 @@ fn main() {
         }
     });
 
+    let pool = ThreadPool::new(10);
+
     let mut buf = [0; 2048];
 
     loop {
@@ -189,9 +193,7 @@ fn main() {
                 let challengeresponse = challengeresponse.clone();
                 let info = info.clone();
                 let master_servers = master_servers.clone();
-                thread::spawn(move || {
-                    println!("new thread Spawned.");
-
+                pool.execute(move || {
                     let s = str::from_utf8(&buf[4..amt]).unwrap_or("Invalid str");
                     println!("{}", s);
 
@@ -202,10 +204,10 @@ fn main() {
                             let info = info.read().unwrap();
                             let info = replace_ver(&info[..]);
                             if !challenge.is_empty() {
-                                sock.send_to(&*add_challenge(&info, challenge, 17), src)
+                                sock.send_to(&*add_challenge(&info, challenge, 17), src).unwrap()
                             } else {
-                                sock.send_to(&*info, src)
-                            }
+                                sock.send_to(&*info, src).unwrap()
+                            };
                         }
                         s if s.starts_with("getstatus") => {
                             let (_, challenge) = s.split_at("getstatus".len());
@@ -215,12 +217,11 @@ fn main() {
                             } else {
                                 getstatus(host).unwrap()
                             };
-                            sock.send_to(&replace_ver(&status[..]), src)
+                            sock.send_to(&replace_ver(&status[..]), src).unwrap();
                         }
                         s if s.starts_with("getchallenge") => {
-                            let tmp = sock.send_to(&challengeresponse[..], src);
+                            sock.send_to(&challengeresponse[..], src).unwrap();
                             upd_info_and_heartbeat(sock, host, info, &master_servers);
-                            tmp
                         }
                         s => panic!("Invalid request type: {}", s),
                     }

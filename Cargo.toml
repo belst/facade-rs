@@ -7,3 +7,4 @@ authors = ["belst <git@bel.st>"]
 dotenv="*"
 regex="*"
 lazy_static="*"
+threadpool="*"
