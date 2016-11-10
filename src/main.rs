@@ -146,6 +146,7 @@ fn main() {
         .split_whitespace()
         .filter_map(|s| s.to_socket_addrs().unwrap().next())
         .collect();
+    let num_threads = env::var("WORKER_THREADS").unwrap_or("10".to_string()).parse().unwrap();
 
     let info = Arc::new(RwLock::new(vec![]));
 
@@ -178,7 +179,7 @@ fn main() {
         }
     });
 
-    let pool = ThreadPool::new(10);
+    let pool = ThreadPool::new(num_threads);
 
     let mut buf = [0; 2048];
 
