@@ -84,6 +84,27 @@ fn add_challenge(haystack: &[u8], challenge: &str, len: usize) -> Vec<u8> {
     vec
 }
 
+fn replace_hostname(haystack: &[u8], hostname: &str) -> Vec<u8> {
+    assert!(!hostname.contains(r"\")); // hostname mustn't contain a \
+    lazy_static! {
+        static ref RE: Regex = Regex::new(r"\\(?P<hn>(?:sv_)?hostname)\\.+?\\").unwrap();
+    }
+
+    RE.replace(haystack,
+               concat_bstring(&[r"\$hn\".as_bytes(), hostname.as_bytes(), r"\".as_bytes()])
+                   .as_slice())
+}
+
+#[test]
+fn replace_hostname_test() {
+    let before = b"\xFF\xFF\xFF\xFFinfoResponse\n\\challenge\\HvpWVoTjnBI\\version\\ET Legacy 2.74a linux-i386 Jan  1 2016\\protocol\\82\\hostname\\^7sKy^2-^7e^2.^7Begin^2ners XPS^7ave\\serverload\\0\\mapname\\baserace_desert\\clients\\18\\humans\\0\\sv_maxclients\\34\\gametype\\6\\pure\\1\\game\\silent\\friendlyFire\\0\\maxlives\\0\\needpass\0\\gamename\\et\\g_antilag\\1\\weaprestrict\\100\\balancedteams\\1";
+    let expected = b"\xFF\xFF\xFF\xFFinfoResponse\n\\challenge\\HvpWVoTjnBI\\version\\ET Legacy 2.74a linux-i386 Jan  1 2016\\protocol\\82\\hostname\\abcdef\\serverload\\0\\mapname\\baserace_desert\\clients\\18\\humans\\0\\sv_maxclients\\34\\gametype\\6\\pure\\1\\game\\silent\\friendlyFire\\0\\maxlives\\0\\needpass\0\\gamename\\et\\g_antilag\\1\\weaprestrict\\100\\balancedteams\\1";
+    let mut v: Vec<u8> = Vec::new();
+    v.extend(expected.iter());
+    let after = replace_hostname(before, "abcdef");
+    assert_eq!(after, v);
+}
+
 fn replace_ver(haystack: &[u8]) -> Vec<u8> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"\\protocol\\\d{2}").unwrap();
@@ -128,7 +149,7 @@ fn main() {
     dotenv().ok();
 
     let listen = env::var("LISTEN")
-        .unwrap_or("0.0.0.0:27960".to_string())
+        .unwrap_or("0.0.0.0:27960".into())
         .to_socket_addrs()
         .unwrap()
         .next()
@@ -141,12 +162,13 @@ fn main() {
         .unwrap();
     let challengeresponse = concat_bstring(&[b"\xFF\xFF\xFF\xFFprint\nET://",
                                              env::var("SERVER_ADDR").unwrap().as_bytes()]);
+    let hostname = env::var("HOSTNAME").unwrap_or("".into());
     let master_servers: Vec<SocketAddr> = env::var("MASTER_SERVERS")
-        .unwrap_or("etmaster.idsoftware.com:27950".to_string())
+        .unwrap_or("etmaster.idsoftware.com:27950".into())
         .split_whitespace()
         .filter_map(|s| s.to_socket_addrs().unwrap().next())
         .collect();
-    let num_threads = env::var("WORKER_THREADS").unwrap_or("10".to_string()).parse().unwrap();
+    let num_threads = env::var("WORKER_THREADS").unwrap_or("10".into()).parse().unwrap();
 
     let info = Arc::new(RwLock::new(vec![]));
 
@@ -194,6 +216,7 @@ fn main() {
                 let challengeresponse = challengeresponse.clone();
                 let info = info.clone();
                 let master_servers = master_servers.clone();
+                let hostname = hostname.clone();
                 pool.execute(move || {
                     let s = str::from_utf8(&buf[4..amt]).unwrap_or("Invalid str");
                     println!("{}", s);
@@ -203,7 +226,10 @@ fn main() {
                             let (_, challenge) = s.split_at("getinfo".len());
                             let challenge = challenge.trim();
                             let info = info.read().unwrap();
-                            let info = replace_ver(&info[..]);
+                            let mut info = replace_ver(info.as_slice());
+                            if !hostname.is_empty() {
+                                info = replace_hostname(info.as_slice(), &hostname);
+                            }
                             if !challenge.is_empty() {
                                 sock.send_to(&*add_challenge(&info, challenge, 17), src).unwrap()
                             } else {
@@ -213,15 +239,19 @@ fn main() {
                         s if s.starts_with("getstatus") => {
                             let (_, challenge) = s.split_at("getstatus".len());
                             let challenge = challenge.trim();
-                            let status = if !challenge.is_empty() {
+                            let mut status = if !challenge.is_empty() {
                                 add_challenge(&getstatus(host).unwrap(), challenge, 19)
                             } else {
                                 getstatus(host).unwrap()
                             };
-                            sock.send_to(&replace_ver(&status[..]), src).unwrap();
+                            if !hostname.is_empty() {
+                                status = replace_hostname(status.as_slice(), &hostname);
+                            };
+
+                            sock.send_to(&replace_ver(status.as_slice()), src).unwrap();
                         }
                         s if s.starts_with("getchallenge") => {
-                            sock.send_to(&challengeresponse[..], src).unwrap();
+                            sock.send_to(challengeresponse.as_slice(), src).unwrap();
                             upd_info_and_heartbeat(sock, host, info, &master_servers);
                         }
                         s => panic!("Invalid request type: {}", s),
