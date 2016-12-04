@@ -91,8 +91,7 @@ fn replace_hostname(haystack: &[u8], hostname: &str) -> Vec<u8> {
     }
 
     RE.replace(haystack,
-               concat_bstring(&[r"\$hn\".as_bytes(), hostname.as_bytes(), r"\".as_bytes()])
-                   .as_slice())
+               concat_bstring(&[br"\$hn\", hostname.as_bytes(), br"\"]).as_slice())
 }
 
 #[test]
